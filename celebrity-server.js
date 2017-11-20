@@ -41,6 +41,10 @@ CelebrityServer.broadcastToAllPlayers = function (msg, params, game) {
     CelebrityServer.broadcastHandler(msg, params, ids);
 }
 
+CelebrityServer.broadcastToGameOwner = function (msg, params, game) {
+    CelebrityServer.broadcastHandler(msg, params, [game.ownerId]);
+}
+
 CelebrityServer.broadcastTeamPlayersUpdated = function (game) {
     CelebrityServer.broadcastToAllPlayers(
         'PLAYERS_UPDATED', 
@@ -52,6 +56,13 @@ CelebrityServer.broadcastTeamPlayersUpdated = function (game) {
     );    
 }
 
+CelebrityServer.broadcastAllPlayersReady = function () {
+    CelebrityServer.broadcastToGameOwner(
+        'ALL_PLAYERS_READY', 
+        {},
+        game        
+    );    
+}
 
 CelebrityServer.echo = function(params) {
     return {echo: params.value};
@@ -143,7 +154,7 @@ CelebrityServer.changePlayerTeam = function (params, playerId) {
         return {error: 'Only the game owner can change other players team'};
     }
     
-    let player = game.players[playerId];
+    let player = game.players[targetPlayerId];
 
     if (player.team !=1 && player.team != 2) {
         return {error: 'Cannot determine player team'};
@@ -176,9 +187,54 @@ CelebrityServer.changePlayerTeam = function (params, playerId) {
 
 CelebrityServer.setCurrentPlayerCelebrities = function (params, playerId) {
     let { celebrities } = params;
+
+    if (celebrities.length < 10) {
+        return {error: 'Player sent less celebrities than required (10)'};        
+    }
+
+    let game = getCurrentGame(playerId);
+    let player = game.players[playerId];
+
+    player.celebrities = celebrities;
+
+    let allPlayersReady = true;
+    for (let player of values(game.players)) {
+        if (!player.celebrities || player.celebrities.length < 10) {
+            allPlayersReady = false;
+            break;
+        }
+    }
+
+    if (allPlayersReady) {
+        CelebrityServer.broadcastAllPlayersReady();
+    }
+}
+
+CelebrityServer.kickPlayerFromGame = function(params, playerId) {
+    let targetPlayerId = params.playerId ? params.playerId : playerId;
+
     let game = getCurrentGame(playerId);
     
+    if (game.ownerId != playerId && targetPlayerId != playerId) {
+        return {error: 'Only the game owner can kick other players'};
+    }
+    
+    let player = game.players[targetPlayerId];
 
+    if (player.team !=1 && player.team != 2) {
+        return {error: 'Cannot determine player team'};
+    }
+
+    let orig = player.team == 1 ? game.team1Ids : game.team2Ids;
+
+    let indOrig = orig.indexOf(playerId);
+
+    if (indOrig < 0) {
+        return {error: 'Cannot find player in his/her team'};
+    }
+
+    orig.splice(indOrig, 1);
+    CelebrityServer.broadcastTeamPlayersUpdated(game);
 }
 
 exports = module.exports = CelebrityServer;
