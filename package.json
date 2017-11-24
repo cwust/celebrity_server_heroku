@@ -15,6 +15,7 @@
     "express-session": "^1.15.6",
     "memorystore": "^1.6.0",
     "utf-8-validate": "3.0.4",
+    "uuid": "^3.1.0",
     "ws": "3.3.1"
   }
 }
